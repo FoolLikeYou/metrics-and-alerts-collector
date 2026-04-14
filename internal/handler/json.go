@@ -19,7 +19,8 @@ func isJSONContentType(ct string) bool {
 	return ct == "application/json"
 }
 
-// PostJSONUpdate обрабатывает POST /update с телом application/json.
+// PostJSONUpdate обрабатывает POST /update (и /update/) с телом application/json.
+// Path-формат /update/{type}/{name}/{value} обрабатывается в PostUpdate.
 func PostJSONUpdate(store repository.MetricsRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if ct := r.Header.Get("Content-Type"); ct != "" && !isJSONContentType(ct) {
@@ -38,6 +39,7 @@ func PostJSONUpdate(store repository.MetricsRepository) http.HandlerFunc {
 			return
 		}
 
+		var out models.Metrics
 		switch m.MType {
 		case models.Gauge:
 			if m.Value == nil {
@@ -45,18 +47,29 @@ func PostJSONUpdate(store repository.MetricsRepository) http.HandlerFunc {
 				return
 			}
 			store.SetGauge(m.ID, *m.Value)
+			v, _ := store.GetGauge(m.ID)
+			out = models.Metrics{ID: m.ID, MType: models.Gauge, Value: &v}
 		case models.Counter:
 			if m.Delta == nil {
 				http.Error(w, "counter requires delta", http.StatusBadRequest)
 				return
 			}
 			store.AddCounter(m.ID, *m.Delta)
+			c, _ := store.GetCounter(m.ID)
+			out = models.Metrics{ID: m.ID, MType: models.Counter, Delta: &c}
 		default:
 			http.Error(w, "invalid metric type", http.StatusBadRequest)
 			return
 		}
 
+		raw, err := json.Marshal(out)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(raw)
 	}
 }
 

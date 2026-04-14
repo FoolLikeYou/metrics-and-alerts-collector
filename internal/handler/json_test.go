@@ -13,6 +13,23 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/storage"
 )
 
+func TestPostJSONUpdate_TrailingSlash_OK(t *testing.T) {
+	store := storage.NewMemStorage()
+	mux := server.NewRouter(store)
+	body := `{"id":"slash","type":"gauge","value":3}`
+	req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	v, ok := store.GetGauge("slash")
+	if !ok || v != 3 {
+		t.Fatalf("gauge: %v ok=%v", v, ok)
+	}
+}
+
 func TestPostJSONUpdate_OK(t *testing.T) {
 	store := storage.NewMemStorage()
 	mux := server.NewRouter(store)
@@ -24,6 +41,13 @@ func TestPostJSONUpdate_OK(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status %d body %s", rr.Code, rr.Body.String())
+	}
+	var updGauge models.Metrics
+	if err := json.Unmarshal(rr.Body.Bytes(), &updGauge); err != nil {
+		t.Fatal(err)
+	}
+	if updGauge.ID != "x" || updGauge.MType != models.Gauge || updGauge.Value == nil || *updGauge.Value != 1.5 {
+		t.Fatalf("update response: %+v", updGauge)
 	}
 	v, ok := store.GetGauge("x")
 	if !ok || v != 1.5 {
@@ -37,6 +61,13 @@ func TestPostJSONUpdate_OK(t *testing.T) {
 	mux.ServeHTTP(rr2, req2)
 	if rr2.Code != http.StatusOK {
 		t.Fatalf("counter status %d", rr2.Code)
+	}
+	var updCounter models.Metrics
+	if err := json.Unmarshal(rr2.Body.Bytes(), &updCounter); err != nil {
+		t.Fatal(err)
+	}
+	if updCounter.ID != "c" || updCounter.MType != models.Counter || updCounter.Delta == nil || *updCounter.Delta != 3 {
+		t.Fatalf("update counter response: %+v", updCounter)
 	}
 	n, ok := store.GetCounter("c")
 	if !ok || n != 3 {

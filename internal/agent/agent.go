@@ -50,6 +50,15 @@ func New(cfg Config, s MetricSender, rnd *rand.Rand) *Agent {
 
 // Run блокируется до отмены ctx или ошибки отправки.
 func (a *Agent) Run(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	// Иначе при REPORT_INTERVAL < POLL_INTERVAL первые тики report срабатывают до poll.C
+	// и уходят пустые — на сервере нет метрик, автотесты получают 404 и «нет изменения».
+	a.pollOnce()
+
 	poll := time.NewTicker(a.cfg.PollInterval)
 	report := time.NewTicker(a.cfg.ReportInterval)
 	defer poll.Stop()

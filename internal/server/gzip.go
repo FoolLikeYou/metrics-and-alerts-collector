@@ -52,6 +52,7 @@ func maybeGunzipRequestBody(r *http.Request) error {
 		return err
 	}
 	r.Body = &gzipRequestCloser{Reader: zr, underlying: r.Body}
+	r.Header.Del("Content-Encoding")
 	return nil
 }
 

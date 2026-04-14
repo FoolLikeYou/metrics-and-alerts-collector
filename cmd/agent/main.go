@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -14,18 +15,15 @@ import (
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/sender"
 )
 
+const defaultServerAddr = "localhost:8080"
+
 func main() {
-	srvAddr := flag.String("a", "localhost:8080", "HTTP server address (host:port or URL)")
+	srvAddr := flag.String("a", defaultServerAddr, "HTTP server address (host:port or URL)")
 	reportSec := flag.Int("r", 10, "report interval, seconds")
 	pollSec := flag.Int("p", 2, "poll interval, seconds")
 	flag.Parse()
 
-	addr := *srvAddr
-	if v, ok := os.LookupEnv("ADDRESS"); ok {
-		if t := strings.TrimSpace(v); t != "" {
-			addr = t
-		}
-	}
+	addr := resolveServerAddr(strings.TrimSpace(*srvAddr))
 
 	report := *reportSec
 	if v, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
@@ -66,6 +64,51 @@ func main() {
 	if err := a.Run(context.Background()); err != nil && err != context.Canceled {
 		log.Fatal(err)
 	}
+}
+
+// resolveServerAddr: ADDRESS из env; иначе флаг -a с учётом SERVER_PORT из автотестов metricstest.
+//
+// metricstest часто передаёт агенту -a в виде http://localhost:8080 — это не равно строке
+// "localhost:8080", и старая логика не подставляла SERVER_PORT, из‑за чего агент бил в :8080,
+// а сервер слушал случайный порт (connection reset, метрики «без изменений»).
+func resolveServerAddr(flagAddr string) string {
+	addr := strings.TrimSpace(flagAddr)
+	if addr == "" {
+		addr = defaultServerAddr
+	}
+	if v := strings.TrimSpace(os.Getenv("ADDRESS")); v != "" {
+		return v
+	}
+	if sp := strings.TrimSpace(os.Getenv("SERVER_PORT")); sp != "" && isDefaultLocalMetricsAddr(addr) {
+		return "localhost:" + sp
+	}
+	if addr != defaultServerAddr {
+		return addr
+	}
+	if sp := strings.TrimSpace(os.Getenv("SERVER_PORT")); sp != "" {
+		return "localhost:" + sp
+	}
+	return addr
+}
+
+// isDefaultLocalMetricsAddr — «шаблонный» адрес метрик-сервера на localhost:8080 (схема опциональна).
+func isDefaultLocalMetricsAddr(addr string) bool {
+	a := strings.TrimSpace(addr)
+	a = strings.TrimSuffix(a, "/")
+	a = strings.TrimPrefix(a, "http://")
+	a = strings.TrimPrefix(a, "https://")
+	if a == defaultServerAddr {
+		return true
+	}
+	host, port, err := net.SplitHostPort(a)
+	if err != nil {
+		return false
+	}
+	if port != "8080" {
+		return false
+	}
+	h := strings.Trim(strings.ToLower(host), "[]")
+	return h == "localhost" || h == "127.0.0.1" || h == "::1"
 }
 
 func normalizeServerURL(addr string) string {

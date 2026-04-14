@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -24,7 +25,7 @@ func main() {
 	restoreFlag := flag.Bool("r", false, "load metrics from file on startup (true/false)")
 	flag.Parse()
 
-	addr := stringFromEnvOrFlag("ADDRESS", *addrFlag)
+	addr := httpListenAddr(stringFromEnvOrFlag("ADDRESS", *addrFlag))
 	storeInterval := intFromEnvOrFlag("STORE_INTERVAL", *storeIntervalFlag)
 	filePath := filePathFromEnvOrFlag("FILE_STORAGE_PATH", *filePathFlag)
 	restore := restoreFromEnvOrFlag(*restoreFlag)
@@ -51,6 +52,21 @@ func main() {
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// httpListenAddr для localhost/127.0.0.1/[::1] слушает ":port", чтобы клиенты с Host localhost
+// (часто резолвятся в [::1]) и агент не получали connection refused из‑за только IPv4-сокета.
+func httpListenAddr(addr string) string {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(addr))
+	if err != nil {
+		return addr
+	}
+	switch strings.ToLower(host) {
+	case "localhost", "127.0.0.1", "::1", "[::1]":
+		return ":" + port
+	default:
+		return addr
 	}
 }
 

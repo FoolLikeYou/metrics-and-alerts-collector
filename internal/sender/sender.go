@@ -23,7 +23,15 @@ type HTTPSender struct {
 // NewHTTPSender создаёт отправитель. baseURL без завершающего слэша, например http://localhost:8080.
 func NewHTTPSender(client *http.Client, baseURL string) *HTTPSender {
 	if client == nil {
-		client = http.DefaultClient
+		// Отключаем авто-добавление Accept-Encoding: gzip и авто-распаковку ответа:
+		// иначе при несогласованных заголовках/теле ответа DefaultTransport даёт EOF на чтении тела.
+		if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+			tr := dt.Clone()
+			tr.DisableCompression = true
+			client = &http.Client{Transport: tr}
+		} else {
+			client = http.DefaultClient
+		}
 	}
 	return &HTTPSender{client: client, baseURL: strings.TrimRight(baseURL, "/")}
 }
@@ -46,7 +54,6 @@ func (s *HTTPSender) SendMetric(ctx context.Context, m metric.Metric) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("Accept-Encoding", "gzip")
 
 	resp, err := s.client.Do(req)
 	if err != nil {

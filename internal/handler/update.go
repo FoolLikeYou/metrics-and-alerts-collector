@@ -14,7 +14,8 @@ const (
 	metricGauge   = "gauge"
 )
 
-// PostUpdate обрабатывает POST /update/{type}/{name}/{value}.
+// PostUpdate обрабатывает POST /update/{type}/{name}/{value} (старый контракт).
+// JSON-обновления — отдельный маршрут POST /update, см. PostJSONUpdate.
 func PostUpdate(store repository.MetricsRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "type")

@@ -31,6 +31,39 @@ func TestNewRouter_AcceptsUpdate(t *testing.T) {
 	}
 }
 
+// Оба контракта POST /update: path-стиль и JSON-тело на одном роутере.
+func TestNewRouter_UpdateLegacyPathAndJSONBothWork(t *testing.T) {
+	store := storage.NewMemStorage()
+	mux := server.NewRouter(store)
+
+	leg := httptest.NewRequest(http.MethodPost, "/update/counter/Legacy/7", nil)
+	leg.Header.Set("Content-Type", "text/plain")
+	rrL := httptest.NewRecorder()
+	mux.ServeHTTP(rrL, leg)
+	if rrL.Code != http.StatusOK {
+		t.Fatalf("legacy status: %d", rrL.Code)
+	}
+	n, ok := store.GetCounter("Legacy")
+	if !ok || n != 7 {
+		t.Fatalf("legacy counter: %d ok=%v", n, ok)
+	}
+
+	js := httptest.NewRequest(http.MethodPost, "/update", bytes.NewBufferString(`{"id":"JsonM","type":"gauge","value":1.25}`))
+	js.Header.Set("Content-Type", "application/json")
+	rrJ := httptest.NewRecorder()
+	mux.ServeHTTP(rrJ, js)
+	if rrJ.Code != http.StatusOK {
+		t.Fatalf("json status: %d %s", rrJ.Code, rrJ.Body.String())
+	}
+	g, ok := store.GetGauge("JsonM")
+	if !ok || g != 1.25 {
+		t.Fatalf("json gauge: %v ok=%v", g, ok)
+	}
+	if n2, _ := store.GetCounter("Legacy"); n2 != 7 {
+		t.Fatalf("legacy counter changed: %d", n2)
+	}
+}
+
 func TestNewRouter_GzipJSONUpdateAndValue(t *testing.T) {
 	store := storage.NewMemStorage()
 	mux := server.NewRouter(store)
