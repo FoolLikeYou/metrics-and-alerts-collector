@@ -1,13 +1,15 @@
 package sender
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
+	models "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model"
 	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/metric"
 )
 
@@ -25,24 +27,19 @@ func NewHTTPSender(client *http.Client, baseURL string) *HTTPSender {
 	return &HTTPSender{client: client, baseURL: strings.TrimRight(baseURL, "/")}
 }
 
-// SendMetric выполняет POST /update/{type}/{name}/{value}.
+// SendMetric выполняет POST /update с телом JSON (application/json).
 func (s *HTTPSender) SendMetric(ctx context.Context, m metric.Metric) error {
-	var value string
-	switch m.MType {
-	case metric.TypeGauge:
-		value = strconv.FormatFloat(m.Gauge, 'f', -1, 64)
-	case metric.TypeCounter:
-		value = strconv.FormatInt(m.Delta, 10)
-	default:
-		return fmt.Errorf("unknown metric type: %s", m.MType)
-	}
-
-	url := fmt.Sprintf("%s/update/%s/%s/%s", s.baseURL, m.MType, m.Name, value)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	body, err := jsonBody(m)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "text/plain")
+
+	url := s.baseURL + "/update"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -56,4 +53,25 @@ func (s *HTTPSender) SendMetric(ctx context.Context, m metric.Metric) error {
 		return fmt.Errorf("unexpected status: %s", resp.Status)
 	}
 	return nil
+}
+
+func jsonBody(m metric.Metric) ([]byte, error) {
+	switch m.MType {
+	case metric.TypeGauge:
+		v := m.Gauge
+		return json.Marshal(models.Metrics{
+			ID:    m.Name,
+			MType: models.Gauge,
+			Value: &v,
+		})
+	case metric.TypeCounter:
+		d := m.Delta
+		return json.Marshal(models.Metrics{
+			ID:    m.Name,
+			MType: models.Counter,
+			Delta: &d,
+		})
+	default:
+		return nil, fmt.Errorf("unknown metric type: %s", m.MType)
+	}
 }

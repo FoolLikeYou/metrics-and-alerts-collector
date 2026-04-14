@@ -16,6 +16,8 @@ func NewRouter(store repository.MetricsRepository) http.Handler {
 	r := chi.NewRouter()
 	r.Use(loggingMiddleware(logger))
 	r.Post("/update/{type}/{name}/{value}", handler.PostUpdate(store))
+	r.Post("/update", handler.PostJSONUpdate(store))
+	r.Post("/value", handler.PostJSONValue(store))
 	r.Get("/value/{type}/{name}", handler.GetValue(store))
 	r.Get("/", handler.ListHTML(store))
 	return r
