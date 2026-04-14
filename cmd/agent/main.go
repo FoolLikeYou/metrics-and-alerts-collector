@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log"
 	"math/rand"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,14 +20,43 @@ func main() {
 	pollSec := flag.Int("p", 2, "poll interval, seconds")
 	flag.Parse()
 
-	if *reportSec <= 0 || *pollSec <= 0 {
-		log.Fatalf("intervals must be positive (seconds): -r=%d -p=%d", *reportSec, *pollSec)
+	addr := *srvAddr
+	if v, ok := os.LookupEnv("ADDRESS"); ok {
+		if t := strings.TrimSpace(v); t != "" {
+			addr = t
+		}
+	}
+
+	report := *reportSec
+	if v, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
+		if t := strings.TrimSpace(v); t != "" {
+			n, err := strconv.Atoi(t)
+			if err != nil || n <= 0 {
+				log.Fatalf("invalid REPORT_INTERVAL %q: want positive integer seconds", v)
+			}
+			report = n
+		}
+	}
+
+	poll := *pollSec
+	if v, ok := os.LookupEnv("POLL_INTERVAL"); ok {
+		if t := strings.TrimSpace(v); t != "" {
+			n, err := strconv.Atoi(t)
+			if err != nil || n <= 0 {
+				log.Fatalf("invalid POLL_INTERVAL %q: want positive integer seconds", v)
+			}
+			poll = n
+		}
+	}
+
+	if report <= 0 || poll <= 0 {
+		log.Fatalf("intervals must be positive (seconds): report=%d poll=%d", report, poll)
 	}
 
 	cfg := agent.Config{
-		PollInterval:   time.Duration(*pollSec) * time.Second,
-		ReportInterval: time.Duration(*reportSec) * time.Second,
-		ServerURL:      normalizeServerURL(*srvAddr),
+		PollInterval:   time.Duration(poll) * time.Second,
+		ReportInterval: time.Duration(report) * time.Second,
+		ServerURL:      normalizeServerURL(addr),
 	}
 
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
