@@ -1,17 +1,22 @@
 package main
 
 import (
-	"metrics-and-alerts-collector/internal/handler"
-	"metrics-and-alerts-collector/internal/repository"
+	"flag"
+	"log"
 	"net/http"
+
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/server"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/storage"
 )
 
 func main() {
-	st := repository.NewMemStorage()
+	addr := flag.String("a", "localhost:8080", "HTTP server listen address")
+	flag.Parse()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/update/", handler.UpdateHandler(st))
-	mux.HandleFunc("/metrics", handler.ListHandler(st))
+	store := storage.NewMemStorage()
+	mux := server.NewRouter(store)
 
-	_ = http.ListenAndServe(":8080", mux)
+	if err := http.ListenAndServe(*addr, mux); err != nil {
+		log.Fatal(err)
+	}
 }

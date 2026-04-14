@@ -1,8 +1,8 @@
 package handler
 
 import (
-	models "metrics-and-alerts-collector/internal/model"
-	"metrics-and-alerts-collector/internal/repository"
+	models "github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/model"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 	"net/http"
 	"strconv"
 	"strings"

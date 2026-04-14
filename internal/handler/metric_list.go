@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"metrics-and-alerts-collector/internal/repository"
+	"github.com/Yandex-Practicum/go-musthave-metrics-tpl/internal/repository"
 )
 
 func ListHandler(storage repository.Storage) http.HandlerFunc {
