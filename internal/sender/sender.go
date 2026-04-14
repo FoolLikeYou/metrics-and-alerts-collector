@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -33,13 +34,19 @@ func (s *HTTPSender) SendMetric(ctx context.Context, m metric.Metric) error {
 	if err != nil {
 		return err
 	}
+	payload, err := gzipBytes(body)
+	if err != nil {
+		return err
+	}
 
 	url := s.baseURL + "/update"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -74,4 +81,17 @@ func jsonBody(m metric.Metric) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unknown metric type: %s", m.MType)
 	}
+}
+
+func gzipBytes(raw []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write(raw); err != nil {
+		_ = gw.Close()
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

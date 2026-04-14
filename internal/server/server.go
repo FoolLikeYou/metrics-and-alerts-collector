@@ -15,6 +15,7 @@ func NewRouter(store repository.MetricsRepository) http.Handler {
 	logger := zap.Must(zap.NewProduction())
 	r := chi.NewRouter()
 	r.Use(loggingMiddleware(logger))
+	r.Use(gzipMiddleware)
 	r.Post("/update/{type}/{name}/{value}", handler.PostUpdate(store))
 	r.Post("/update", handler.PostJSONUpdate(store))
 	r.Post("/value", handler.PostJSONValue(store))
